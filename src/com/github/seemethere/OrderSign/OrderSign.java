@@ -14,9 +14,9 @@ import org.bukkit.command.Command;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -34,7 +34,6 @@ public class OrderSign extends JavaPlugin implements Listener{
 	FileConfiguration config;
 	private Economy economyApi = null;
 
-	public HashMap<String, Boolean> BoughtSign = new HashMap<String, Boolean>();
 	public HashMap<String, String> identifyBoughtSign = new HashMap<String, String>();
 	
 	public void onDisable() {
@@ -139,13 +138,11 @@ public class OrderSign extends JavaPlugin implements Listener{
 			String playerName = sender.getName();
 
 			if(toggle == true) {
-				this.BoughtSign.put(playerName, true);
 				this.identifyBoughtSign.put(playerName, signBought);
-				sender.sendMessage(pluginName + ChatColor.LIGHT_PURPLE + "Right click a blank sign to complete your order!");
+				sender.sendMessage(pluginName + ChatColor.LIGHT_PURPLE + "Break a blank sign to complete your order!");
 			}
 
 			if(toggle == false) {
-				this.BoughtSign.remove(playerName);
 				this.identifyBoughtSign.remove(playerName);
 			}
 
@@ -154,35 +151,34 @@ public class OrderSign extends JavaPlugin implements Listener{
 		}
 	}
 
-	@EventHandler
-	public void onPlayerInteract(PlayerInteractEvent event) {
-		if(event.getAction().equals(Action.RIGHT_CLICK_BLOCK)) {
-			String pluginName = colorHandler(this.getConfig().getString("DisplayName"));
-			Player player = event.getPlayer();
-			Block block = event.getClickedBlock();
+	@EventHandler(priority = EventPriority.HIGHEST)
+	public void onBlockBreak(BlockBreakEvent event) {
+		Block block = event.getBlock();
+		String pluginName = colorHandler(this.getConfig().getString("DisplayName"));
+		Player player = event.getPlayer();
 
-			if(block.getState() instanceof Sign) {
-				BlockState stateBlock = block.getState();
-				Sign sign = (Sign) stateBlock;
-				boolean check = emptySign(sign, player);
+		if(block.getState() instanceof Sign) {
+			BlockState stateBlock = block.getState();
+			Sign sign = (Sign) stateBlock;
+			boolean check = emptySign(sign, player);
 
-				if(this.BoughtSign.containsKey(player.getName())) {
-					if(check == true) {
-						Economy e = economyApi;
-						String s = this.identifyBoughtSign.get(player.getName());
-						double cost = this.getConfig().getDouble("signs." + s + ".cost");
-						//player.sendMessage("BoughtSign was true!");
-						fillSign(player, block);
-						e.withdrawPlayer(player.getName(), cost);
-						player.sendMessage(pluginName + ChatColor.GREEN + "$" + cost + " has been charged from your account!");
-						toggleBoughtSign(player, false, "");
-						return;
-					} else if(check == false) {
-						player.sendMessage(pluginName + ChatColor.RED + "Sign was not blank! Transaction Cancelled!");
-						toggleBoughtSign(player, false, "");
-						return;
-					} 
-				}
+			if(this.identifyBoughtSign.containsKey(player.getName())) {
+				event.setCancelled(true);
+				if(check == true) {
+					Economy e = economyApi;
+					String s = this.identifyBoughtSign.get(player.getName());
+					double cost = this.getConfig().getDouble("signs." + s + ".cost");
+					//player.sendMessage("BoughtSign was true!");
+					fillSign(player, block);
+					e.withdrawPlayer(player.getName(), cost);
+					player.sendMessage(pluginName + ChatColor.GREEN + "$" + cost + " has been charged from your account!");
+					toggleBoughtSign(player, false, "");
+					return;
+				} else if(check == false) {
+					player.sendMessage(pluginName + ChatColor.RED + "Sign was not blank! Transaction Cancelled!");
+					toggleBoughtSign(player, false, "");
+					return;
+				} 
 			}
 		}
 	}
