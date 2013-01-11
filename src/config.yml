@@ -1,0 +1,15 @@
+DisplayName: "[&eOrderSign&f] "
+
+signs:
+    Disposal:
+        cost: 15000
+        1: "&1[Disposal]"
+        2: ""
+        3: ""
+        4: ""
+    Spawn:
+        cost: 15000
+        1: "&1[Warp]"
+        2: "Spawn"
+        3: ""
+        4: ""

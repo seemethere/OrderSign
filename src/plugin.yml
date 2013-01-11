@@ -1,0 +1,9 @@
+name: OrderSign
+main: com.github.seemethere.OrderSign.OrderSign
+version: 1.0
+
+commands:
+    ordersign:
+        description: Basic command for the plugin
+        usage: /<command> argument
+
