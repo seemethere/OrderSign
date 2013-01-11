@@ -207,10 +207,10 @@ public class OrderSign extends JavaPlugin implements Listener{
 		BlockState blockstate = block.getState();
 		Sign sign = (Sign) blockstate;
 
-		String line0 = colorHandler(this.getConfig().getString("signs." + s + ".1"));
-		String line1 = colorHandler(this.getConfig().getString("signs." + s + ".2"));
-		String line2 = colorHandler(this.getConfig().getString("signs." + s + ".3"));
-		String line3 = colorHandler(this.getConfig().getString("signs." + s + ".4"));
+		String line0 = colorHandler(this.getConfig().getString("signs." + s + ".line1"));
+		String line1 = colorHandler(this.getConfig().getString("signs." + s + ".line2"));
+		String line2 = colorHandler(this.getConfig().getString("signs." + s + ".line3"));
+		String line3 = colorHandler(this.getConfig().getString("signs." + s + ".line4"));
 
 		try {
 			sign.setLine(0, line0);
