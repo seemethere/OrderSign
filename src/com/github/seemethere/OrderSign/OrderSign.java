@@ -88,6 +88,14 @@ public class OrderSign extends JavaPlugin implements Listener{
 				return true;
 			}
 
+            //About, for build number
+            if(args.length == 1 && (args[0].equalsIgnoreCase("about") || args[0].equalsIgnoreCase("version"))) {
+                sender.sendMessage(pluginName);
+                sender.sendMessage(ChatColor.AQUA + "by seemethere and jjkoletar");
+                sender.sendMessage(ChatColor.DARK_RED + "Version: " + getDescription().getVersion());
+                return true;
+            }
+
 			//If they enter a weird name
 			if(args.length == 1 && !sign.contains(args[0])) {
 				sender.sendMessage(pluginName + ChatColor.RED + "Unknown sign! " + errorMessage);
