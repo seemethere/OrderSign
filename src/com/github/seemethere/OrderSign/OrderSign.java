@@ -30,8 +30,9 @@ import net.milkbowl.vault.economy.Economy;
 
 public class OrderSign extends JavaPlugin implements Listener{
 
+    private static final String PLUGIN_NAME = "[\u00A7eOrderSign\u00A7f] ";
+
 	public Logger logger = Logger.getLogger("Minecraft");
-	FileConfiguration config;
 	private Economy economyApi = null;
 
 	public HashMap<String, String> identifyBoughtSign = new HashMap<String, String>();
@@ -73,57 +74,65 @@ public class OrderSign extends JavaPlugin implements Listener{
 
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 		if(command.getName().equalsIgnoreCase("ordersign")) {
-			String pluginName = colorHandler(this.getConfig().getString("DisplayName"));
 			Player player = (Player) sender;
 			String errorMessage = "Use /ordersign to see the available signs";
-			Set<String> sign = this.getConfig().getConfigurationSection("signs").getKeys(false);
+			Set<String> signs = this.getConfig().getConfigurationSection("signs").getKeys(false);
+
 			Economy e = economyApi;
 
 			double cost = 0.00;
 
 			//Too many arguments
 			if(args.length > 1) {
-				sender.sendMessage(pluginName + ChatColor.RED + "Too many arguments! " + errorMessage);
-				return true;
-			}
-
-            //About, for build number
-            if(args.length == 1 && (args[0].equalsIgnoreCase("about") || args[0].equalsIgnoreCase("version"))) {
-                sender.sendMessage(pluginName);
-                sender.sendMessage(ChatColor.AQUA + "by seemethere and jjkoletar");
-                sender.sendMessage(ChatColor.DARK_RED + "Version: " + getDescription().getVersion());
-                return true;
-            }
-
-			//If they enter a weird name
-			if(args.length == 1 && !sign.contains(args[0])) {
-				sender.sendMessage(pluginName + ChatColor.RED + "Unknown sign! " + errorMessage);
-				return true;
-			}
-
-			//If they enter an available name
-			if(args.length == 1 && sign.contains(args[0])) {
-				cost = this.getConfig().getDouble("signs." + args[0] + ".cost");
-
-				//If player does not have enough money
-				if(e.getBalance(player.getName()) < cost) {
-					sender.sendMessage(pluginName + ChatColor.RED + "Insufficient Funds! Sign costs " + ChatColor.GREEN + "$" + cost);
-					return true;
-				}
-
-				toggleBoughtSign(sender, true, args[0]);
-
+				sender.sendMessage(PLUGIN_NAME + ChatColor.RED + "Too many arguments! " + errorMessage);
 				return true;
 			}
 
 			//Displays all available signs
 			if(args.length == 0) {
-				sender.sendMessage(ChatColor.DARK_RED + "NOTE: All signs are case sensitive");
 				sender.sendMessage(ChatColor.YELLOW + "Available Signs: ");
 				for(String s : this.getConfig().getConfigurationSection("signs").getKeys(false)) {
 					cost = this.getConfig().getDouble("signs." + s + ".cost");
 					sender.sendMessage(ChatColor.LIGHT_PURPLE + s + ChatColor.GREEN + " ($" + cost + ")");
 				}
+				return true;
+			}
+
+			String subcommand = args[0].toLowerCase();
+
+            //About, for build number
+            if(args.length == 1 && (subcommand.equalsIgnoreCase("about") || subcommand.equalsIgnoreCase("version"))) {
+                sender.sendMessage(PLUGIN_NAME);
+                sender.sendMessage(ChatColor.AQUA + "by seemethere and jjkoletar");
+                sender.sendMessage(ChatColor.DARK_RED + "Version: " + getDescription().getVersion());
+                return true;
+            }
+
+            String sign = null;
+            for (String s : signs) {
+                if (s.equalsIgnoreCase(subcommand)) {
+                    sign = s;
+                }
+            }
+
+			//If they enter a weird name
+			if(args.length == 1 && sign == null) {
+				sender.sendMessage(PLUGIN_NAME + ChatColor.RED + "Unknown sign! " + errorMessage);
+				return true;
+			}
+
+			//If they enter an available name
+			if(args.length == 1 && sign != null) {
+				cost = this.getConfig().getDouble("signs." + sign + ".cost");
+
+				//If player does not have enough money
+				if(e.getBalance(player.getName()) < cost) {
+					sender.sendMessage(PLUGIN_NAME + ChatColor.RED + "Insufficient Funds! Sign costs " + ChatColor.GREEN + "$" + cost);
+					return true;
+				}
+
+				toggleBoughtSign(sender, true, sign);
+
 				return true;
 			}
 		}
@@ -134,12 +143,11 @@ public class OrderSign extends JavaPlugin implements Listener{
 
 	private void toggleBoughtSign(CommandSender sender, boolean toggle, String signBought) {
 		try {
-			String pluginName = colorHandler(this.getConfig().getString("DisplayName"));
 			String playerName = sender.getName();
 
 			if(toggle == true) {
 				this.identifyBoughtSign.put(playerName, signBought);
-				sender.sendMessage(pluginName + ChatColor.LIGHT_PURPLE + "Break a blank sign to complete your order!");
+				sender.sendMessage(PLUGIN_NAME + ChatColor.LIGHT_PURPLE + "Break a blank sign to complete your order!");
 			}
 
 			if(toggle == false) {
@@ -153,8 +161,10 @@ public class OrderSign extends JavaPlugin implements Listener{
 
 	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onBlockBreak(BlockBreakEvent event) {
+	    if (event.isCancelled()) {
+	        return;
+	    }
 		Block block = event.getBlock();
-		String pluginName = colorHandler(this.getConfig().getString("DisplayName"));
 		Player player = event.getPlayer();
 
 		if(block.getState() instanceof Sign) {
@@ -171,11 +181,12 @@ public class OrderSign extends JavaPlugin implements Listener{
 					//player.sendMessage("BoughtSign was true!");
 					fillSign(player, block);
 					e.withdrawPlayer(player.getName(), cost);
-					player.sendMessage(pluginName + ChatColor.GREEN + "$" + cost + " has been charged from your account!");
+					player.sendMessage(PLUGIN_NAME + ChatColor.GREEN + "$" + cost + " has been charged from your account!");
+					logger.info("[OrderSign] Sold " + player.getName() + " a " + s + " at " + event.getBlock().getLocation().toString());
 					toggleBoughtSign(player, false, "");
 					return;
 				} else if(check == false) {
-					player.sendMessage(pluginName + ChatColor.RED + "Sign was not blank! Transaction Cancelled!");
+					player.sendMessage(PLUGIN_NAME + ChatColor.RED + "Sign was not blank! Transaction Cancelled!");
 					toggleBoughtSign(player, false, "");
 					return;
 				} 

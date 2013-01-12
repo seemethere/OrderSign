@@ -6,4 +6,5 @@ commands:
     ordersign:
         description: Basic command for the plugin
         usage: /<command> argument
+        aliases: [sign]
 
