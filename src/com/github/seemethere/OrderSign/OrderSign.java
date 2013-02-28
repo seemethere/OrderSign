@@ -44,33 +44,43 @@ public class OrderSign extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        LoadConfig();
+        if(!LoadConfig())
+            return;
+        //Set up Economy
         RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
         if (economyProvider != null)
             economyApi = economyProvider.getProvider();
         else
             logger.severe("[OrderSign] Unable to initialize Economy Interface with Vault!");
-        if (this.getConfig().getConfigurationSection("signs") != null)
-            signs = this.getConfig().getConfigurationSection("signs").getKeys(false);
+
         this.getServer().getPluginManager().registerEvents(this, this);
         logger.info(this.toString() + "has been Enabled!");
     }
 
-    private void LoadConfig() {
+    private boolean LoadConfig() {
         File pluginFolder = getDataFolder();
         if (!pluginFolder.exists() && !pluginFolder.mkdir()) {
-            System.out.println("Could not make plugin folder!");
-            return;
+            logger.severe(this.toString() + "Could not make plugin folder!");
+            return false;
         }
         File configFile = new File(getDataFolder(), "config.yml");
         if (!configFile.exists())
             this.saveDefaultConfig();
+        //Get Config
+        this.reloadConfig();
+        if (this.getConfig().getConfigurationSection("signs") != null)
+            signs = this.getConfig().getConfigurationSection("signs").getKeys(false);
+        else {
+            logger.severe(this.toString() + "Invalid config! Exiting...");
+            return false;
+        }
+        return true;
     }
 
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("ordersign")) {
             if (!(sender instanceof Player)) {
-                logger.info(PLUGIN_NAME + "NO COMMANDS FOR CONSOLE");
+                logger.info(this.toString() + "NO COMMANDS FOR CONSOLE");
                 return true;
             }
             Player p = (Player) sender;
@@ -81,7 +91,9 @@ public class OrderSign extends JavaPlugin implements Listener {
             if (args.length == 1) {
                 if (args[0].equalsIgnoreCase("about") || args[0].equalsIgnoreCase("version"))
                     c_about(p);
-                    //Checks if the arg entered is a number (page)
+                else if (p.isOp() && args[0].equalsIgnoreCase("reload"))
+                    c_reload(p);
+                //Checks if the arg entered is a number (page)
                 else if (convert_int(args[0]) >= 0)
                     c_list(p, convert_int(args[0]), 5);
                 else
@@ -90,6 +102,13 @@ public class OrderSign extends JavaPlugin implements Listener {
                 c_list(p, 1, 5);
         }
         return true;
+    }
+
+    private void c_reload(Player p) {
+        if(LoadConfig())
+            p.sendMessage(PLUGIN_NAME + "Config reload");
+        else
+            p.sendMessage(PLUGIN_NAME + ChatColor.DARK_RED + "ERROR RELOADING CONFIG");
     }
 
     private void c_about(Player p) {
@@ -118,18 +137,15 @@ public class OrderSign extends JavaPlugin implements Listener {
 
     private void c_list(Player p, int page, int page_sz) {
         //Catch page numbers greater than the max
-        if ((((page * page_sz) - 1) - page_sz) > signs.size() || page == 0) {
+        if (((page * page_sz) - page_sz) >= signs.size() || page == 0) {
             p.sendMessage(String.format("%s%sInavlid page number", PLUGIN_NAME, ChatColor.RED));
             return;
         }
         int i = 0;
-        int max = page * 5;
-        int min = max - 5;
         int pg_max = (int) Math.ceil(signs.size() / (float) page_sz);
-        if (page == 1) {
-            min = 0;
-            max = 5;
-        }
+        int max = page * page_sz;
+        int min = max - page_sz;
+        //Actual sending of the message
         p.sendMessage(String.format("%sAvailable Signs: (Page %d of %d)", ChatColor.YELLOW, page, pg_max));
         for (String s : signs) {
             if (i >= max)
@@ -200,7 +216,7 @@ public class OrderSign extends JavaPlugin implements Listener {
             this.i_sign.remove(p.getName());
     }
 
-    public String colorHandler(String s) {
+    public String color_h(String s) {
         return s.replaceAll("&([0-9a-f])", "\u00A7$1");
     }
 
@@ -215,7 +231,7 @@ public class OrderSign extends JavaPlugin implements Listener {
         String s = this.i_sign.get(player);
         Sign sign = (Sign) block.getState();
         for (int i = 0; i < 4; i++)
-            sign.setLine(i, colorHandler(this.getConfig().getString("signs." + s + ".line" + (i + 1))));
+            sign.setLine(i, color_h(this.getConfig().getString("signs." + s + ".line" + (i + 1))));
         sign.update();
     }
 }
