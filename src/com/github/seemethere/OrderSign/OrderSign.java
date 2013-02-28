@@ -25,33 +25,36 @@ import java.util.logging.Logger;
  */
 
 public class OrderSign extends JavaPlugin implements Listener {
-
     private static final String PLUGIN_NAME = "[\u00A7eOrderSign\u00A7f] ";
     public Logger logger = Logger.getLogger("Minecraft");
     private Economy economyApi = null;
-    private HashMap<String, String> identifyBoughtSign = new HashMap<String, String>();
-    private String errorMessage = "Use /ordersign to see the available signs";
+    private HashMap<String, String> i_sign = new HashMap<String, String>();
+    private String error_m = "Use /ordersign to see the available signs";
+    private Set<String> signs = null;
 
+    @Override
     public void onDisable() {
-        System.out.println(this.toString() + "has been Disabled!");
+        i_sign = null;
+        error_m = null;
+        signs = null;
+        economyApi = null;
+        logger.info(this.toString() + "has been Disabled!");
+        logger = null;
     }
 
+    @Override
     public void onEnable() {
-
         LoadConfig();
-
         RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
-        if (economyProvider != null) {
+        if (economyProvider != null)
             economyApi = economyProvider.getProvider();
-        } else {
+        else
             logger.severe("[OrderSign] Unable to initialize Economy Interface with Vault!");
-        }
-
+        if (this.getConfig().getConfigurationSection("signs") != null)
+            signs = this.getConfig().getConfigurationSection("signs").getKeys(false);
         this.getServer().getPluginManager().registerEvents(this, this);
-
-        System.out.println(this.toString() + "has been Enabled!");
+        logger.info(this.toString() + "has been Enabled!");
     }
-
 
     private void LoadConfig() {
         File pluginFolder = getDataFolder();
@@ -59,7 +62,6 @@ public class OrderSign extends JavaPlugin implements Listener {
             System.out.println("Could not make plugin folder!");
             return;
         }
-
         File configFile = new File(getDataFolder(), "config.yml");
         if (!configFile.exists())
             this.saveDefaultConfig();
@@ -67,36 +69,33 @@ public class OrderSign extends JavaPlugin implements Listener {
 
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("ordersign")) {
-            if(!(sender instanceof Player)) {
+            if (!(sender instanceof Player)) {
                 logger.info(PLUGIN_NAME + "NO COMMANDS FOR CONSOLE");
                 return true;
             }
             Player p = (Player) sender;
-            Set<String> signs = this.getConfig().getConfigurationSection("signs").getKeys(false);
-            //Too many arguments
             if (args.length > 1) {
-                sender.sendMessage(PLUGIN_NAME + ChatColor.RED + "Too many arguments! " + errorMessage);
+                sender.sendMessage(String.format("%s%sToo many arguments! %s", PLUGIN_NAME, ChatColor.RED, error_m));
                 return true;
             }
             if (args.length == 1) {
                 if (args[0].equalsIgnoreCase("about") || args[0].equalsIgnoreCase("version"))
                     c_about(p);
-                //Checks if the arg entered is a number (page)
+                    //Checks if the arg entered is a number (page)
                 else if (convert_int(args[0]) >= 0)
-                    c_list(p, convert_int(args[0]), signs);
+                    c_list(p, convert_int(args[0]), 5);
                 else
-                    c_sign(find_Sign(args[0], signs), p);
-            } else
-                c_list(p, 1, signs);
+                    c_sign(find_Sign(args[0]), p);
+            } else //No arguments at all, defaults to first page of signs
+                c_list(p, 1, 5);
         }
         return true;
     }
 
     private void c_about(Player p) {
         //About, for build number
-        p.sendMessage(PLUGIN_NAME);
-        p.sendMessage(ChatColor.AQUA + "by seemethere and jjkoletar");
-        p.sendMessage(ChatColor.DARK_RED + "Version: " + getDescription().getVersion());
+        p.sendMessage(String.format("%s%sby seemethere and jjkoletar", PLUGIN_NAME, ChatColor.AQUA));
+        p.sendMessage(String.format("%sVersion: %s", ChatColor.DARK_RED, getDescription().getVersion()));
     }
 
     private void c_sign(String sign, Player p) {
@@ -106,107 +105,99 @@ public class OrderSign extends JavaPlugin implements Listener {
             cost = this.getConfig().getDouble("signs." + sign + ".cost");
             //If p does not have enough money
             if (e.getBalance(p.getName()) < cost) {
-                p.sendMessage(PLUGIN_NAME + ChatColor.RED + "Insufficient Funds! Sign costs " + ChatColor.GREEN + "$" + cost);
+                p.sendMessage(String.format("%s%sInsufficient Funds! Sign costs %s$%s",
+                        PLUGIN_NAME, ChatColor.RED, ChatColor.GREEN, cost));
                 return;
             }
             toggleBoughtSign(p, true, sign);
-        } else //If they enter a weird name
-            p.sendMessage(PLUGIN_NAME + ChatColor.RED + "Unknown sign! " + errorMessage);
-    }
-
-    private int convert_int(String arg) {
-        //Catch bad page numbers
-        try {
-            return Integer.valueOf(arg);
-        } catch (NumberFormatException e) {
-            return -1;
+        } else { //If they enter a weird name
+            p.sendMessage(String.format("%s%sUnknown sign!", PLUGIN_NAME, ChatColor.RED));
+            p.sendMessage(String.format("%s%s%s", PLUGIN_NAME, ChatColor.RED, error_m));
         }
     }
-    private void c_list(Player p, int page, Set<String> signs) {
+
+    private void c_list(Player p, int page, int page_sz) {
         //Catch page numbers greater than the max
-        if ((((page * 5) - 1) - 5) > signs.size() || page == 0) {
-            p.sendMessage(PLUGIN_NAME + ChatColor.RED + "Inavlid page number");
+        if ((((page * page_sz) - 1) - page_sz) > signs.size() || page == 0) {
+            p.sendMessage(String.format("%s%sInavlid page number", PLUGIN_NAME, ChatColor.RED));
             return;
         }
         int i = 0;
         int max = page * 5;
         int min = max - 5;
-        int pg_max = (int) Math.ceil(signs.size() / (float) 5);
+        int pg_max = (int) Math.ceil(signs.size() / (float) page_sz);
         if (page == 1) {
             min = 0;
             max = 5;
         }
-        p.sendMessage(ChatColor.YELLOW + "Available Signs: (Page " + page + " of " + pg_max + ")");
+        p.sendMessage(String.format("%sAvailable Signs: (Page %d of %d)", ChatColor.YELLOW, page, pg_max));
         for (String s : signs) {
             if (i >= max)
                 break;
-            else if (i >= min) {
-                double cost = this.getConfig().getDouble("signs." + s + ".cost");
-                p.sendMessage(ChatColor.YELLOW + "* " + ChatColor.LIGHT_PURPLE + s
-                        + ChatColor.GREEN + " ($" + cost + ")");
-            }
+            else if (i >= min)
+                p.sendMessage(String.format("%s* %s%s%s ($%.2f)",
+                        ChatColor.YELLOW, ChatColor.LIGHT_PURPLE, s, ChatColor.GREEN,
+                        this.getConfig().getDouble("signs." + s + ".cost")));
             i++;
         }
-        p.sendMessage(ChatColor.YELLOW + "   - Use " + ChatColor.GREEN + "/ordersign <page> "
-                + ChatColor.YELLOW + "for more pages!");
-        p.sendMessage(ChatColor.YELLOW + "   - Use " + ChatColor.GREEN + "/ordersign <sign name>"
-                + ChatColor.YELLOW + " to order a sign!");
+        p.sendMessage(String.format("%s   - Use %s/ordersign <page> %sfor more pages!",
+                ChatColor.YELLOW, ChatColor.GREEN, ChatColor.YELLOW));
+        p.sendMessage(String.format("%s   - Use %s/ordersign <sign name>%s to order a sign!",
+                ChatColor.YELLOW, ChatColor.GREEN, ChatColor.YELLOW));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (event.isCancelled()) {
+        if (event.isCancelled())
             return;
-        }
-        Block block = event.getBlock();
-        Player player = event.getPlayer();
-
-        if (block.getState() instanceof Sign) {
-            BlockState stateBlock = block.getState();
-            Sign sign = (Sign) stateBlock;
-            boolean check = check_emptySign(sign);
-
-            if (this.identifyBoughtSign.containsKey(player.getName())) {
+        Block b = event.getBlock();
+        Player p = event.getPlayer();
+        if (b.getState() instanceof Sign) {
+            BlockState b_st = b.getState();
+            Sign sign = (Sign) b_st;
+            boolean is_Empty = check_emptySign(sign);
+            if (this.i_sign.containsKey(p.getName())) {
                 event.setCancelled(true);
-                if (check) {
+                if (is_Empty) {
                     Economy e = economyApi;
-                    String s = this.identifyBoughtSign.get(player.getName());
+                    String s = this.i_sign.get(p.getName());
                     double cost = this.getConfig().getDouble("signs." + s + ".cost");
-                    //player.sendMessage("BoughtSign was true!");
-                    fillSign(player, block);
-                    e.withdrawPlayer(player.getName(), cost);
-                    player.sendMessage(PLUGIN_NAME + ChatColor.GREEN + "$" + cost + " has been charged from your account!");
-                    logger.info("[OrderSign] Sold " + player.getName() + " a " + s + " at " + event.getBlock().getLocation().toString());
-                    toggleBoughtSign(player, false, "");
-                } else {
-                    player.sendMessage(PLUGIN_NAME + ChatColor.RED + "Sign was not blank! Transaction Cancelled!");
-                    toggleBoughtSign(player, false, "");
-                }
+                    fillSign(p.getName(), b);
+                    e.withdrawPlayer(p.getName(), cost);
+                    p.sendMessage(String.format("%s%s$%.2f has been charged from your account!",
+                            PLUGIN_NAME, ChatColor.GREEN, cost));
+                    logger.info("[OrderSign] Sold " + p.getName() + " a "
+                            + s + " at " + event.getBlock().getLocation().toString());
+                } else
+                    p.sendMessage(String.format("%s%sSign was not blank! Transaction Cancelled!",
+                            PLUGIN_NAME, ChatColor.RED));
+                toggleBoughtSign(p, false, "");
             }
         }
     }
 
-    private String find_Sign(String c, Set<String> signs) {
-        for (String s : signs) {
-            if (s.equalsIgnoreCase(c)) {
-                return s;
-            }
+    private int convert_int(String arg) {
+        try {  //Catch bad page numbers
+            return Integer.valueOf(arg);
+        } catch (NumberFormatException e) {
+            return -1;
         }
+    }
+
+    private String find_Sign(String c) {
+        for (String s : signs)
+            if (s.equalsIgnoreCase(c))
+                return s;
         return null;
     }
 
-    private void toggleBoughtSign(CommandSender sender, boolean toggle, String signBought) {
-        try {
-            String playerName = sender.getName();
-
-            if (toggle) {
-                this.identifyBoughtSign.put(playerName, signBought);
-                sender.sendMessage(PLUGIN_NAME + ChatColor.LIGHT_PURPLE + "Break a blank sign to complete your order!");
-            } else
-                this.identifyBoughtSign.remove(playerName);
-        } catch (Exception e) {
-            getLogger().info("An error occured with toggleBoughtSign");
-        }
+    private void toggleBoughtSign(Player p, boolean toggle, String sign) {
+        if (toggle) {
+            this.i_sign.put(p.getName(), sign);
+            p.sendMessage(String.format("%s%sBreak a blank sign to complete your order!",
+                    PLUGIN_NAME, ChatColor.LIGHT_PURPLE));
+        } else
+            this.i_sign.remove(p.getName());
     }
 
     public String colorHandler(String s) {
@@ -214,31 +205,17 @@ public class OrderSign extends JavaPlugin implements Listener {
     }
 
     public boolean check_emptySign(Sign sign) {
-        for (int i = 0; i <= 3; i++)
+        for (int i = 0; i < 4; i++)
             if (!sign.getLine(i).isEmpty())
                 return false;
         return true;
     }
 
-    public void fillSign(Player player, Block block) {
-
-        String s = this.identifyBoughtSign.get(player.getName());
-        BlockState blockstate = block.getState();
-        Sign sign = (Sign) blockstate;
-
-        String line0 = colorHandler(this.getConfig().getString("signs." + s + ".line1"));
-        String line1 = colorHandler(this.getConfig().getString("signs." + s + ".line2"));
-        String line2 = colorHandler(this.getConfig().getString("signs." + s + ".line3"));
-        String line3 = colorHandler(this.getConfig().getString("signs." + s + ".line4"));
-
-        try {
-            sign.setLine(0, line0);
-            sign.setLine(1, line1);
-            sign.setLine(2, line2);
-            sign.setLine(3, line3);
-            sign.update();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public void fillSign(String player, Block block) {
+        String s = this.i_sign.get(player);
+        Sign sign = (Sign) block.getState();
+        for (int i = 0; i < 4; i++)
+            sign.setLine(i, colorHandler(this.getConfig().getString("signs." + s + ".line" + (i + 1))));
+        sign.update();
     }
 }
