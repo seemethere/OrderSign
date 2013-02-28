@@ -16,7 +16,7 @@
             </fileset>
         </copy>
         <replace file="build/plugin.yml" token="$version$" value="${build.version}"/>
-        <jar jarfile="bin/OrderSign.jar" basedir="build"/>
+        <jar jarfile="OrderSign.jar" basedir="build"/>
         <delete dir="build"/>
     </target>
 </project>
