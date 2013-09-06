@@ -16,8 +16,9 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Set;
+import java.util.List;
 import java.util.logging.Logger;
 
 /**
@@ -26,17 +27,16 @@ import java.util.logging.Logger;
 
 public class OrderSign extends JavaPlugin implements Listener {
     private static final String PLUGIN_NAME = "[\u00A7eOrderSign\u00A7f] ";
-    public Logger logger = Logger.getLogger("Minecraft");
+    public Logger logger;
     private Economy economyApi = null;
     private HashMap<String, String> i_sign = new HashMap<String, String>();
     private String error_m = "Use /ordersign to see the available signs";
-    private Set<String> signs = null;
+    private HashMap<String, SignData> signDataHashMap;
 
     @Override
     public void onDisable() {
         i_sign = null;
         error_m = null;
-        signs = null;
         economyApi = null;
         logger.info(this.toString() + "has been Disabled!");
         logger = null;
@@ -44,23 +44,24 @@ public class OrderSign extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        if(!LoadConfig())
+        if (!LoadConfig())
             return;
+        logger = this.getLogger();
         //Set up Economy
         RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
         if (economyProvider != null)
             economyApi = economyProvider.getProvider();
         else
-            logger.severe("[OrderSign] Unable to initialize Economy Interface with Vault!");
+            logger.severe("Unable to initialize Economy Interface with Vault!");
 
         this.getServer().getPluginManager().registerEvents(this, this);
-        logger.info(this.toString() + "has been Enabled!");
+        logger.info("OrderSign has been Enabled!");
     }
 
     private boolean LoadConfig() {
         File pluginFolder = getDataFolder();
         if (!pluginFolder.exists() && !pluginFolder.mkdir()) {
-            logger.severe(this.toString() + "Could not make plugin folder!");
+            logger.severe("Could not make plugin folder!");
             return false;
         }
         File configFile = new File(getDataFolder(), "config.yml");
@@ -68,19 +69,33 @@ public class OrderSign extends JavaPlugin implements Listener {
             this.saveDefaultConfig();
         //Get Config
         this.reloadConfig();
-        if (this.getConfig().getConfigurationSection("signs") != null)
-            signs = this.getConfig().getConfigurationSection("signs").getKeys(false);
-        else {
-            logger.severe(this.toString() + "Invalid config! Exiting...");
-            return false;
-        }
+        loadSigns();
         return true;
+    }
+
+    private void loadSigns() {
+        signDataHashMap = new HashMap<String, SignData>();
+        if (this.getConfig().getConfigurationSection("signs") != null) {
+            for (String s : this.getConfig().getConfigurationSection("signs").getKeys(false)) {
+                signDataHashMap.put(s, new SignData(s,
+                        this.getConfig().getString("signs." + s + ".line" + (1)),
+                        this.getConfig().getString("signs." + s + ".line" + (2)),
+                        this.getConfig().getString("signs." + s + ".line" + (3)),
+                        this.getConfig().getString("signs." + s + ".line" + (4)),
+                        this.getConfig().getString("signs." + s + ".permission"),
+                        this.getConfig().getDouble("signs." + s + ".cost")));
+            }
+        }
     }
 
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("ordersign")) {
             if (!(sender instanceof Player)) {
-                logger.info(this.toString() + "NO COMMANDS FOR CONSOLE");
+                if (sender.isOp() && args[0].equalsIgnoreCase("reload")) {
+                    c_reload(sender);
+                    return true;
+                }
+                logger.info("Not a valid command for console");
                 return true;
             }
             Player p = (Player) sender;
@@ -89,26 +104,30 @@ public class OrderSign extends JavaPlugin implements Listener {
                 return true;
             }
             if (args.length == 1) {
-                if (args[0].equalsIgnoreCase("about") || args[0].equalsIgnoreCase("version"))
+                if (args[0].equalsIgnoreCase("about") || args[0].equalsIgnoreCase("version")) {
                     c_about(p);
-                else if (p.isOp() && args[0].equalsIgnoreCase("reload"))
+                } else if (p.isOp() && args[0].equalsIgnoreCase("reload")) {
                     c_reload(p);
+                }
                 //Checks if the arg entered is a number (page)
-                else if (convert_int(args[0]) >= 0)
+                else if (convert_int(args[0]) >= 0) {
                     c_list(p, convert_int(args[0]), 5);
-                else
+                } else {
                     c_sign(find_Sign(args[0]), p);
-            } else //No arguments at all, defaults to first page of signs
+                }
+            } else { //No arguments at all, defaults to first page of signs
                 c_list(p, 1, 5);
+            }
         }
         return true;
     }
 
-    private void c_reload(Player p) {
-        if(LoadConfig())
-            p.sendMessage(PLUGIN_NAME + "Config reload");
-        else
-            p.sendMessage(PLUGIN_NAME + ChatColor.DARK_RED + "ERROR RELOADING CONFIG");
+    private void c_reload(CommandSender sender) {
+        if (LoadConfig()) {
+            sender.sendMessage(PLUGIN_NAME + "Config reload");
+        } else {
+            sender.sendMessage(PLUGIN_NAME + ChatColor.DARK_RED + "ERROR RELOADING CONFIG");
+        }
     }
 
     private void c_about(Player p) {
@@ -121,6 +140,12 @@ public class OrderSign extends JavaPlugin implements Listener {
         Economy e = economyApi;
         double cost;
         if (sign != null) {
+            if (!p.hasPermission(signDataHashMap.get(sign).getPermission())) {
+                p.sendMessage(String.format("%s%sInsufficient permissions for sign!",
+                        PLUGIN_NAME, ChatColor.DARK_RED));
+                p.sendMessage(String.format("%s%s%s", PLUGIN_NAME, ChatColor.RED, error_m));
+                return;
+            }
             cost = this.getConfig().getDouble("signs." + sign + ".cost");
             //If p does not have enough money
             if (e.getBalance(p.getName()) < cost) {
@@ -135,37 +160,48 @@ public class OrderSign extends JavaPlugin implements Listener {
         }
     }
 
-    private void c_list(Player p, int page, int page_sz) {
+    private void c_list(Player player, int page, int page_sz) {
         //Catch page numbers greater than the max
+        List<String> signs = getApplicableSigns(player);
         if (((page * page_sz) - page_sz) >= signs.size() || page == 0) {
-            p.sendMessage(String.format("%s%sInavlid page number", PLUGIN_NAME, ChatColor.RED));
+            player.sendMessage(String.format("%s%sInavlid page number", PLUGIN_NAME, ChatColor.RED));
             return;
         }
+        //Pagination
         int i = 0;
         int pg_max = (int) Math.ceil(signs.size() / (float) page_sz);
         int max = page * page_sz;
         int min = max - page_sz;
         //Actual sending of the message
-        p.sendMessage(String.format("%sAvailable Signs: (Page %d of %d)", ChatColor.YELLOW, page, pg_max));
+        player.sendMessage(String.format("%sAvailable Signs: (Page %d of %d)", ChatColor.YELLOW, page, pg_max));
         for (String s : signs) {
-            if (i >= max)
+            if (i >= max) {
                 break;
-            else if (i >= min)
-                p.sendMessage(String.format("%s* %s%s%s ($%.2f)",
+            } else if (i >= min) {
+                player.sendMessage(String.format("%s* %s%s%s ($%.2f)",
                         ChatColor.YELLOW, ChatColor.LIGHT_PURPLE, s, ChatColor.GREEN,
-                        this.getConfig().getDouble("signs." + s + ".cost")));
+                        signDataHashMap.get(s).getCost()));
+            }
             i++;
         }
-        p.sendMessage(String.format("%s   - Use %s/ordersign <page> %sfor more pages!",
+        player.sendMessage(String.format("%s   - Use %s/ordersign <page> %sfor more pages!",
                 ChatColor.YELLOW, ChatColor.GREEN, ChatColor.YELLOW));
-        p.sendMessage(String.format("%s   - Use %s/ordersign <sign name>%s to order a sign!",
+        player.sendMessage(String.format("%s   - Use %s/ordersign <sign name>%s to order a sign!",
                 ChatColor.YELLOW, ChatColor.GREEN, ChatColor.YELLOW));
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    public List<String> getApplicableSigns(Player player) {
+        List<String> signs = new ArrayList<String>();
+        for (String s : signDataHashMap.keySet()) {
+            if (player.hasPermission(signDataHashMap.get(s).getPermission())) {
+                signs.add(s);
+            }
+        }
+        return signs;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (event.isCancelled())
-            return;
         Block b = event.getBlock();
         Player p = event.getPlayer();
         if (b.getState() instanceof Sign) {
@@ -174,19 +210,24 @@ public class OrderSign extends JavaPlugin implements Listener {
             boolean is_Empty = check_emptySign(sign);
             if (this.i_sign.containsKey(p.getName())) {
                 event.setCancelled(true);
-                if (is_Empty) {
-                    Economy e = economyApi;
-                    String s = this.i_sign.get(p.getName());
-                    double cost = this.getConfig().getDouble("signs." + s + ".cost");
+                Economy e = economyApi;
+                String s = this.i_sign.get(p.getName());
+                double cost = signDataHashMap.get(s).getCost();
+                // Had to add due to a possible exploit where players could be charged to a negative amount
+                if (e.getBalance(p.getName()) < cost) {
+                    p.sendMessage(String.format("%s%sInsufficient Funds! Sign costs %s$%s",
+                            PLUGIN_NAME, ChatColor.RED, ChatColor.GREEN, cost));
+                } else if (is_Empty) {
                     fillSign(p.getName(), b);
                     e.withdrawPlayer(p.getName(), cost);
                     p.sendMessage(String.format("%s%s$%.2f has been charged from your account!",
                             PLUGIN_NAME, ChatColor.GREEN, cost));
                     logger.info("[OrderSign] Sold " + p.getName() + " a "
                             + s + " at " + event.getBlock().getLocation().toString());
-                } else
+                } else {
                     p.sendMessage(String.format("%s%sSign was not blank! Transaction Cancelled!",
                             PLUGIN_NAME, ChatColor.RED));
+                }
                 toggleBoughtSign(p, false, "");
             }
         }
@@ -201,9 +242,11 @@ public class OrderSign extends JavaPlugin implements Listener {
     }
 
     private String find_Sign(String c) {
-        for (String s : signs)
-            if (s.equalsIgnoreCase(c))
+        for (String s : signDataHashMap.keySet()) {
+            if (s.equalsIgnoreCase(c)) {
                 return s;
+            }
+        }
         return null;
     }
 
@@ -212,8 +255,9 @@ public class OrderSign extends JavaPlugin implements Listener {
             this.i_sign.put(p.getName(), sign);
             p.sendMessage(String.format("%s%sBreak a blank sign to complete your order!",
                     PLUGIN_NAME, ChatColor.LIGHT_PURPLE));
-        } else
+        } else {
             this.i_sign.remove(p.getName());
+        }
     }
 
     public String color_h(String s) {
@@ -221,17 +265,20 @@ public class OrderSign extends JavaPlugin implements Listener {
     }
 
     public boolean check_emptySign(Sign sign) {
-        for (int i = 0; i < 4; i++)
-            if (!sign.getLine(i).isEmpty())
+        for (int i = 0; i < 4; i++) {
+            if (!sign.getLine(i).isEmpty()) {
                 return false;
+            }
+        }
         return true;
     }
 
     public void fillSign(String player, Block block) {
         String s = this.i_sign.get(player);
         Sign sign = (Sign) block.getState();
-        for (int i = 0; i < 4; i++)
-            sign.setLine(i, color_h(this.getConfig().getString("signs." + s + ".line" + (i + 1))));
+        for (int i = 0; i < 4; i++) {
+            sign.setLine(i, color_h(signDataHashMap.get(s).getLine(i + 1)));
+        }
         sign.update();
     }
 }
