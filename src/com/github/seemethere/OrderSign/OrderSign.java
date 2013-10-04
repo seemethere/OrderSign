@@ -1,3 +1,26 @@
+/*
+ * OrderSign.java
+ *
+ * Copyright 2013 seemethere
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ *
+ */
+
 package com.github.seemethere.OrderSign;
 
 import net.milkbowl.vault.economy.Economy;
@@ -146,7 +169,7 @@ public class OrderSign extends JavaPlugin implements Listener {
                 p.sendMessage(String.format("%s%s%s", PLUGIN_NAME, ChatColor.RED, error_m));
                 return;
             }
-            cost = this.getConfig().getDouble("signs." + sign + ".cost");
+            cost = signDataHashMap.get(sign).getCost();
             //If p does not have enough money
             if (e.getBalance(p.getName()) < cost) {
                 p.sendMessage(String.format("%s%sInsufficient Funds! Sign costs %s$%s",
@@ -261,7 +284,7 @@ public class OrderSign extends JavaPlugin implements Listener {
     }
 
     public String color_h(String s) {
-        return s.replaceAll("&([0-9a-f])", "\u00A7$1");
+        return ChatColor.translateAlternateColorCodes('&', s);
     }
 
     public boolean check_emptySign(Sign sign) {

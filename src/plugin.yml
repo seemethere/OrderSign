@@ -1,7 +1,7 @@
 name: OrderSign
 author: seemethere
 main: com.github.seemethere.OrderSign.OrderSign
-version: $version$
+version: 1.5
 
 commands:
     ordersign:
