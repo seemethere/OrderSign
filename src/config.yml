@@ -4,14 +4,16 @@ signs:
     Disposal:
         cost: 15000
         permission: "ordersign.disposal"
-        1: "&1[Disposal]"
-        2: ""
-        3: ""
-        4: ""
+        lines:
+            1: "&1[Disposal]"
+            2: ""
+            3: ""
+            4: ""
     Spawn:
         cost: 15000
         permission: "ordersign.spawn"
-        1: "&1[Warp]"
-        2: "Spawn"
-        3: ""
-        4: ""
+        lines:
+            1: "&1[Warp]"
+            2: "Spawn"
+            3: ""
+            4: ""

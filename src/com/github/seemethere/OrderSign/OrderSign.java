@@ -72,10 +72,11 @@ public class OrderSign extends JavaPlugin implements Listener {
         logger = this.getLogger();
         //Set up Economy
         RegisteredServiceProvider<Economy> economyProvider = getServer().getServicesManager().getRegistration(Economy.class);
-        if (economyProvider != null)
+        if (economyProvider != null) {
             economyApi = economyProvider.getProvider();
-        else
+        } else {
             logger.severe("Unable to initialize Economy Interface with Vault!");
+        }
 
         this.getServer().getPluginManager().registerEvents(this, this);
         logger.info("OrderSign has been Enabled!");
@@ -88,8 +89,9 @@ public class OrderSign extends JavaPlugin implements Listener {
             return false;
         }
         File configFile = new File(getDataFolder(), "config.yml");
-        if (!configFile.exists())
+        if (!configFile.exists()) {
             this.saveDefaultConfig();
+        }
         //Get Config
         this.reloadConfig();
         loadSigns();
@@ -101,10 +103,10 @@ public class OrderSign extends JavaPlugin implements Listener {
         if (this.getConfig().getConfigurationSection("signs") != null) {
             for (String s : this.getConfig().getConfigurationSection("signs").getKeys(false)) {
                 signDataHashMap.put(s, new SignData(s,
-                        this.getConfig().getString("signs." + s + ".1"),
-                        this.getConfig().getString("signs." + s + ".2"),
-                        this.getConfig().getString("signs." + s + ".3"),
-                        this.getConfig().getString("signs." + s + ".4"),
+                        this.getConfig().getString("signs." + s + ".lines." + ".1"),
+                        this.getConfig().getString("signs." + s + ".lines." + ".2"),
+                        this.getConfig().getString("signs." + s + ".lines." + ".3"),
+                        this.getConfig().getString("signs." + s + ".lines." + ".4"),
                         this.getConfig().getString("signs." + s + ".permission"),
                         this.getConfig().getDouble("signs." + s + ".cost")));
             }
@@ -186,15 +188,17 @@ public class OrderSign extends JavaPlugin implements Listener {
     private void c_list(Player player, int page, int page_sz) {
         //Catch page numbers greater than the max
         List<String> signs = getApplicableSigns(player);
-        // Catch any players who don't have any permissions
+        // Catch any players who don't have any permissions for any signs
         if (signs.isEmpty()) {
             player.sendMessage(String.format("%s%s Doesn't Seem like you have permissions for any signs!", PLUGIN_NAME, ChatColor.RED));
             return;
         }
+
         if (((page * page_sz) - page_sz) > signs.size() || page == 0) {
             player.sendMessage(String.format("%s%sInavlid page number", PLUGIN_NAME, ChatColor.RED));
             return;
         }
+
         //Pagination
         int i = 0;
         int pg_max = (int) Math.ceil(signs.size() / (float) page_sz);
@@ -212,6 +216,7 @@ public class OrderSign extends JavaPlugin implements Listener {
             }
             i++;
         }
+
         player.sendMessage(String.format("%s   - Use %s/ordersign <page> %sfor more pages!",
                 ChatColor.YELLOW, ChatColor.GREEN, ChatColor.YELLOW));
         player.sendMessage(String.format("%s   - Use %s/ordersign <sign name>%s to order a sign!",
@@ -230,25 +235,26 @@ public class OrderSign extends JavaPlugin implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        Block b = event.getBlock();
-        Player p = event.getPlayer();
-        if (b.getState() instanceof Sign) {
-            BlockState b_st = b.getState();
-            Sign sign = (Sign) b_st;
+        Block block = event.getBlock();
+        Player player = event.getPlayer();
+        if (block.getState() instanceof Sign) {
+            BlockState blockState = block.getState();
+            Sign sign = (Sign) blockState;
             boolean is_Empty = check_emptySign(sign);
-            if (this.i_sign.containsKey(p.getName())) {
+            if (this.i_sign.containsKey(player.getName())) {
+                // Cancel the block break event
                 event.setCancelled(true);
-                Economy e = economyApi;
-                String s = this.i_sign.get(p.getName());
-                double cost = signDataHashMap.get(s).getCost();
+                Economy economy = economyApi;
+                String sign_name = this.i_sign.get(player.getName());
+                double cost = signDataHashMap.get(sign_name).getCost();
                 // Had to add due to a possible exploit where players could be charged to a negative amount
-                if (e.getBalance(p.getName()) < cost) {
-                    p.sendMessage(String.format("%s%sInsufficient Funds! Sign costs %s$%s",
+                if (economy.getBalance(player.getName()) < cost) {
+                    player.sendMessage(String.format("%s%sInsufficient Funds! Sign costs %s$%s",
                             PLUGIN_NAME, ChatColor.RED, ChatColor.GREEN, cost));
                 } else if (is_Empty) {
-                    fillSign(p.getName(), b);
-                    e.withdrawPlayer(p.getName(), cost);
-                    p.sendMessage(String.format("%s%s$%.2f has been charged from your account!",
+                    fillSign(player.getName(), block);
+                    economy.withdrawPlayer(player.getName(), cost);
+                    player.sendMessage(String.format("%s%s$%.2f has been charged from your account!",
                             PLUGIN_NAME, ChatColor.GREEN, cost));
                     // Better Location Reporting
                     String X = "X: " + event.getBlock().getLocation().getX();
@@ -256,13 +262,12 @@ public class OrderSign extends JavaPlugin implements Listener {
                     String Z = "Z: " + event.getBlock().getLocation().getZ();
                     String W = "World: " + event.getBlock().getLocation().getWorld().getName();
                     String loc = "(" + X + " " + Y + " " + Z + ") in " + W;
-                    logger.info("Sold " + p.getName() + " a "
-                            + s + " at " + loc);
+                    logger.info("Sold " + player.getName() + " a " + sign_name + " at " + loc);
                 } else {
-                    p.sendMessage(String.format("%s%sSign was not blank! Transaction Cancelled!",
+                    player.sendMessage(String.format("%s%sSign was not blank! Transaction Cancelled!",
                             PLUGIN_NAME, ChatColor.RED));
                 }
-                toggleBoughtSign(p, false, "");
+                toggleBoughtSign(player, false, "");
             }
         }
     }
@@ -277,7 +282,7 @@ public class OrderSign extends JavaPlugin implements Listener {
 
     private String find_Sign(String c) {
         for (String s : signDataHashMap.keySet()) {
-            if (s.equalsIgnoreCase(c)) {
+            if (s.equalsIgnoreCase(c)) { // Makes this case insensitive
                 return s;
             }
         }
