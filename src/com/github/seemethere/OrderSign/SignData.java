@@ -2,7 +2,7 @@ package com.github.seemethere.OrderSign;
 /*
  * SignData.java
  *
- * Copyright 2013 seemethere
+ * Copyright 2014 seemethere
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ public class SignData {
             case 4:
                 return line4;
             default:
-                return null;
+                return "";
         }
     }
 

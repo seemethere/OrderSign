@@ -1,7 +1,7 @@
 /*
  * OrderSign.java
  *
- * Copyright 2013 seemethere
+ * Copyright 2014 seemethere
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -101,10 +101,10 @@ public class OrderSign extends JavaPlugin implements Listener {
         if (this.getConfig().getConfigurationSection("signs") != null) {
             for (String s : this.getConfig().getConfigurationSection("signs").getKeys(false)) {
                 signDataHashMap.put(s, new SignData(s,
-                        this.getConfig().getString("signs." + s + ".line" + (1)),
-                        this.getConfig().getString("signs." + s + ".line" + (2)),
-                        this.getConfig().getString("signs." + s + ".line" + (3)),
-                        this.getConfig().getString("signs." + s + ".line" + (4)),
+                        this.getConfig().getString("signs." + s + ".1"),
+                        this.getConfig().getString("signs." + s + ".2"),
+                        this.getConfig().getString("signs." + s + ".3"),
+                        this.getConfig().getString("signs." + s + ".4"),
                         this.getConfig().getString("signs." + s + ".permission"),
                         this.getConfig().getDouble("signs." + s + ".cost")));
             }
@@ -186,7 +186,12 @@ public class OrderSign extends JavaPlugin implements Listener {
     private void c_list(Player player, int page, int page_sz) {
         //Catch page numbers greater than the max
         List<String> signs = getApplicableSigns(player);
-        if (((page * page_sz) - page_sz) >= signs.size() || page == 0) {
+        // Catch any players who don't have any permissions
+        if (signs.isEmpty()) {
+            player.sendMessage(String.format("%s%s Doesn't Seem like you have permissions for any signs!", PLUGIN_NAME, ChatColor.RED));
+            return;
+        }
+        if (((page * page_sz) - page_sz) > signs.size() || page == 0) {
             player.sendMessage(String.format("%s%sInavlid page number", PLUGIN_NAME, ChatColor.RED));
             return;
         }
@@ -245,8 +250,14 @@ public class OrderSign extends JavaPlugin implements Listener {
                     e.withdrawPlayer(p.getName(), cost);
                     p.sendMessage(String.format("%s%s$%.2f has been charged from your account!",
                             PLUGIN_NAME, ChatColor.GREEN, cost));
-                    logger.info("[OrderSign] Sold " + p.getName() + " a "
-                            + s + " at " + event.getBlock().getLocation().toString());
+                    // Better Location Reporting
+                    String X = "X: " + event.getBlock().getLocation().getX();
+                    String Y = "Y: " + event.getBlock().getLocation().getY();
+                    String Z = "Z: " + event.getBlock().getLocation().getZ();
+                    String W = "World: " + event.getBlock().getLocation().getWorld().getName();
+                    String loc = "(" + X + " " + Y + " " + Z + ") in " + W;
+                    logger.info("Sold " + p.getName() + " a "
+                            + s + " at " + loc);
                 } else {
                     p.sendMessage(String.format("%s%sSign was not blank! Transaction Cancelled!",
                             PLUGIN_NAME, ChatColor.RED));
